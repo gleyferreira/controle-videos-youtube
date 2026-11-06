@@ -113,7 +113,7 @@
         <div class="grid">
           <div class="field">
             <label for="recordedAt">Data da gravação *</label>
-            <input id="recordedAt" type="date" required>
+            <input id="recordedAt" type="date">
           </div>
           <div class="field">
             <label for="postedAt">Data da postagem</label>
@@ -315,7 +315,7 @@
       channel_name: document.getElementById("channel").value.trim(),
       title: document.getElementById("title").value.trim(),
       video_url: url,
-      recorded_at: document.getElementById("recordedAt").value,
+      recorded_at: document.getElementById("recordedAt").value || null,
       posted_at: document.getElementById("postedAt").value || null
     };
     document.getElementById("saveBtn").disabled = true;
