@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Vídeos do YouTube</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root { --bg:#f4f6fb; --card:#fff; --text:#172033; --muted:#64748b; --line:#e2e8f0; --primary:#2563eb; --danger:#dc2626; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width:1100px; margin:34px auto; padding:0 18px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:22px; }
+    h1 { font-size:25px; margin:0 0 6px; }
+    h2 { font-size:18px; margin:0 0 16px; }
+    p { color:var(--muted); margin:0; line-height:1.5; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; box-shadow:0 5px 20px #0f172a0a; margin-bottom:18px; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    label { display:block; font-size:13px; font-weight:700; margin-bottom:7px; }
+    input { width:100%; padding:11px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; background:#fff; color:var(--text); }
+    input:focus { outline:2px solid #bfdbfe; border-color:var(--primary); }
+    .field { margin-bottom:14px; }
+    button { border:0; border-radius:8px; padding:11px 15px; font-weight:700; cursor:pointer; background:var(--primary); color:#fff; }
+    button.secondary { background:#e8eef8; color:#1e293b; }
+    button.danger { background:#fee2e2; color:#991b1b; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+    .toolbar input { flex:1; min-width:210px; }
+    .toolbar button { white-space:nowrap; }
+    .stats { display:flex; gap:12px; flex-wrap:wrap; margin:16px 0 0; }
+    .stat { background:#eff6ff; border-radius:10px; padding:12px 16px; min-width:145px; }
+    .stat strong { display:block; font-size:22px; color:#1d4ed8; }
+    .stat span { font-size:12px; color:#475569; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; min-width:760px; }
+    th,td { text-align:left; padding:12px 10px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:middle; }
+    th { color:#475569; background:#f8fafc; }
+    td a { color:#1d4ed8; text-decoration:none; }
+    td a:hover { text-decoration:underline; }
+    .small-actions { display:flex; gap:6px; }
+    .small-actions button { padding:7px 9px; font-size:12px; }
+    #message { margin:12px 0; font-size:14px; }
+    .ok { color:#15803d; } .err { color:#b91c1c; }
+    .hidden { display:none !important; }
+    .auth { max-width:440px; margin:65px auto; }
+    .auth .card { padding:28px; }
+    .muted-note { font-size:12px; margin-top:12px; }
+    .top-actions { display:flex; gap:8px; align-items:center; }
+    @media(max-width:650px) {
+      .wrap { margin:20px auto; }
+      header { align-items:flex-start; flex-direction:column; }
+      .grid { grid-template-columns:1fr; gap:0; }
+      .card { padding:17px; }
+      h1 { font-size:22px; }
+      .top-actions { width:100%; }
+    }
+  </style>
+</head>
+<body>
+  <section id="authArea" class="auth">
+    <div class="card">
+      <h1>Controle de Vídeos</h1>
+      <p style="margin-bottom:22px">Entre para cadastrar e organizar seus vídeos do YouTube.</p>
+      <div class="field">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" autocomplete="email" placeholder="seuemail@exemplo.com">
+      </div>
+      <div class="field">
+        <label for="password">Senha</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="Mínimo de 6 caracteres">
+      </div>
+      <div class="actions">
+        <button id="loginBtn">Entrar</button>
+        <button id="signupBtn" class="secondary">Criar conta</button>
+      </div>
+      <div id="authMessage" role="status"></div>
+      <p class="muted-note">A conta é criada no Supabase. Se a confirmação de e-mail estiver habilitada, confirme o endereço antes de entrar.</p>
+    </div>
+  </section>
+
+  <main id="appArea" class="wrap hidden">
+    <header>
+      <div>
+        <h1>Controle de Vídeos do YouTube</h1>
+        <p>Cadastre, consulte e mantenha seu acervo organizado.</p>
+        <div class="stats">
+          <div class="stat"><strong id="totalVideos">0</strong><span>Vídeos cadastrados</span></div>
+          <div class="stat"><strong id="totalChannels">0</strong><span>Canais cadastrados</span></div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span id="userEmail" style="font-size:12px;color:#64748b"></span>
+        <button id="logoutBtn" class="secondary">Sair</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2 id="formTitle">Cadastrar vídeo</h2>
+      <form id="videoForm">
+        <div class="field">
+          <label for="channel">Nome do canal no YouTube *</label>
+          <input id="channel" maxlength="120" required placeholder="Ex.: CurtaIpatinga">
+        </div>
+        <div class="field">
+          <label for="title">Título do vídeo *</label>
+          <input id="title" maxlength="250" required placeholder="Digite o título publicado ou planejado">
+        </div>
+        <div class="field">
+          <label for="videoUrl">Link HTTP/HTTPS do vídeo *</label>
+          <input id="videoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=...">
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="recordedAt">Data da gravação *</label>
+            <input id="recordedAt" type="date" required>
+          </div>
+          <div class="field">
+            <label for="postedAt">Data da postagem</label>
+            <input id="postedAt" type="date">
+          </div>
+        </div>
+        <div class="actions">
+          <button id="saveBtn" type="submit">Salvar vídeo</button>
+          <button id="cancelEditBtn" class="secondary hidden" type="button">Cancelar edição</button>
+        </div>
+      </form>
+      <div id="message" role="status"></div>
+    </section>
+
+    <section class="card">
+      <h2>Vídeos cadastrados</h2>
+      <div class="toolbar">
+        <input id="searchInput" type="search" placeholder="Pesquisar por canal ou título...">
+        <input id="channelFilter" list="channelOptions" placeholder="Filtrar por canal">
+        <datalist id="channelOptions"></datalist>
+        <button id="clearFiltersBtn" class="secondary" type="button">Limpar filtros</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Canal</th><th>Título</th><th>Gravação</th><th>Postagem</th><th>Link</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="videoRows">
+            <tr><td colspan="6">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+<script>
+  // 1) Cole aqui os dados do seu projeto Supabase.
+  const SUPABASE_URL = "https://axmgpwtsxwhcuobnnhwl.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_b9lZxnlpz_OAC5bJwdLlXQ_RjsfBB4N";
+
+  const authArea = document.getElementById("authArea");
+  const appArea = document.getElementById("appArea");
+  const authMessage = document.getElementById("authMessage");
+  const message = document.getElementById("message");
+  const form = document.getElementById("videoForm");
+  const rows = document.getElementById("videoRows");
+  let supabaseClient;
+  let currentUser = null;
+  let videos = [];
+  let editingId = null;
+
+  function showMessage(element, text, isError=false) {
+    element.textContent = text;
+    element.className = isError ? "err" : "ok";
+  }
+  function clearMessage(element) { element.textContent = ""; element.className = ""; }
+  function dateBR(value) {
+    if (!value) return "—";
+    const [y,m,d] = value.split("-");
+    return `${d}/${m}/${y}`;
+  }
+  function escapeText(value) { return String(value ?? ""); }
+
+  function initialize() {
+    if (SUPABASE_URL.startsWith("COLE_AQUI") || SUPABASE_ANON_KEY.startsWith("COLE_AQUI")) {
+      showMessage(authMessage, "Configure a URL e a chave do Supabase no início do código antes de usar.", true);
+      document.getElementById("loginBtn").disabled = true;
+      document.getElementById("signupBtn").disabled = true;
+      return;
+    }
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      currentUser = session?.user ?? null;
+      renderAuth();
+      if (currentUser) loadVideos();
+    });
+    supabaseClient.auth.getSession().then(({data}) => {
+      currentUser = data.session?.user ?? null;
+      renderAuth();
+      if (currentUser) loadVideos();
+    });
+  }
+
+  function renderAuth() {
+    authArea.classList.toggle("hidden", !!currentUser);
+    appArea.classList.toggle("hidden", !currentUser);
+    document.getElementById("userEmail").textContent = currentUser?.email ?? "";
+  }
+
+  document.getElementById("loginBtn").addEventListener("click", async () => {
+    clearMessage(authMessage);
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const {error} = await supabaseClient.auth.signInWithPassword({email, password});
+    if (error) showMessage(authMessage, error.message, true);
+  });
+
+  document.getElementById("signupBtn").addEventListener("click", async () => {
+    clearMessage(authMessage);
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    if (password.length < 6) return showMessage(authMessage, "A senha precisa ter pelo menos 6 caracteres.", true);
+    const {data, error} = await supabaseClient.auth.signUp({email, password});
+    if (error) showMessage(authMessage, error.message, true);
+    else if (!data.session) showMessage(authMessage, "Conta criada! Verifique seu e-mail para confirmar o cadastro e depois entre.");
+    else showMessage(authMessage, "Conta criada com sucesso!");
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await supabaseClient.auth.signOut();
+  });
+
+  async function loadVideos() {
+    rows.innerHTML = '<tr><td colspan="6">Carregando...</td></tr>';
+    const {data, error} = await supabaseClient.from("videos_youtube")
+      .select("*").order("recorded_at", {ascending:false}).order("created_at", {ascending:false});
+    if (error) {
+      rows.innerHTML = '<tr><td colspan="6">Não foi possível carregar os dados.</td></tr>';
+      showMessage(message, error.message, true);
+      return;
+    }
+    videos = data ?? [];
+    renderVideos();
+  }
+
+  function renderVideos() {
+    const query = document.getElementById("searchInput").value.trim().toLowerCase();
+    const channel = document.getElementById("channelFilter").value.trim().toLowerCase();
+    const filtered = videos.filter(v =>
+      (`${v.channel_name} ${v.title}`).toLowerCase().includes(query) &&
+      (!channel || v.channel_name.toLowerCase().includes(channel))
+    );
+    document.getElementById("totalVideos").textContent = videos.length;
+    document.getElementById("totalChannels").textContent = new Set(videos.map(v => v.channel_name.toLowerCase())).size;
+    const channels = [...new Set(videos.map(v => v.channel_name))].sort((a,b) => a.localeCompare(b, "pt-BR"));
+    const datalist = document.getElementById("channelOptions");
+    datalist.replaceChildren();
+    channels.forEach(name => {
+      const option = document.createElement("option");
+      option.value = name;
+      datalist.appendChild(option);
+    });
+    rows.replaceChildren();
+    if (!filtered.length) {
+      const tr = document.createElement("tr"), td = document.createElement("td");
+      td.colSpan = 6; td.textContent = "Nenhum vídeo encontrado."; tr.appendChild(td); rows.appendChild(tr);
+      return;
+    }
+    filtered.forEach(v => {
+      const tr = document.createElement("tr");
+      [v.channel_name, v.title, dateBR(v.recorded_at), dateBR(v.posted_at)].forEach(value => {
+        const td = document.createElement("td"); td.textContent = escapeText(value || "—"); tr.appendChild(td);
+      });
+      const linkTd = document.createElement("td");
+      const link = document.createElement("a"); link.href = v.video_url; link.target = "_blank"; link.rel = "noopener noreferrer";
+      link.textContent = "Abrir vídeo"; linkTd.appendChild(link); tr.appendChild(linkTd);
+      const actionsTd = document.createElement("td");
+      const actions = document.createElement("div"); actions.className = "small-actions";
+      const edit = document.createElement("button"); edit.type = "button"; edit.className = "secondary"; edit.textContent = "Editar";
+      edit.addEventListener("click", () => startEdit(v));
+      const del = document.createElement("button"); del.type = "button"; del.className = "danger"; del.textContent = "Excluir";
+      del.addEventListener("click", () => deleteVideo(v.id));
+      actions.append(edit, del); actionsTd.appendChild(actions); tr.appendChild(actionsTd);
+      rows.appendChild(tr);
+    });
+  }
+
+  function startEdit(v) {
+    editingId = v.id;
+    document.getElementById("channel").value = v.channel_name;
+    document.getElementById("title").value = v.title;
+    document.getElementById("videoUrl").value = v.video_url;
+    document.getElementById("recordedAt").value = v.recorded_at;
+    document.getElementById("postedAt").value = v.posted_at || "";
+    document.getElementById("formTitle").textContent = "Editar vídeo";
+    document.getElementById("saveBtn").textContent = "Atualizar vídeo";
+    document.getElementById("cancelEditBtn").classList.remove("hidden");
+    window.scrollTo({top:0, behavior:"smooth"});
+    clearMessage(message);
+  }
+
+  function resetForm() {
+    form.reset(); editingId = null;
+    document.getElementById("formTitle").textContent = "Cadastrar vídeo";
+    document.getElementById("saveBtn").textContent = "Salvar vídeo";
+    document.getElementById("cancelEditBtn").classList.add("hidden");
+  }
+  document.getElementById("cancelEditBtn").addEventListener("click", resetForm);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault(); clearMessage(message);
+    const url = document.getElementById("videoUrl").value.trim();
+    let parsed;
+    try { parsed = new URL(url); } catch { return showMessage(message, "Informe um link válido.", true); }
+    if (!["http:", "https:"].includes(parsed.protocol)) return showMessage(message, "O link precisa começar com http:// ou https://.", true);
+    const payload = {
+      channel_name: document.getElementById("channel").value.trim(),
+      title: document.getElementById("title").value.trim(),
+      video_url: url,
+      recorded_at: document.getElementById("recordedAt").value,
+      posted_at: document.getElementById("postedAt").value || null
+    };
+    document.getElementById("saveBtn").disabled = true;
+    let result;
+    if (editingId) {
+      result = await supabaseClient.from("videos_youtube").update(payload).eq("id", editingId).select();
+    } else {
+      result = await supabaseClient.from("videos_youtube").insert({...payload, user_id:currentUser.id}).select();
+    }
+    document.getElementById("saveBtn").disabled = false;
+    if (result.error) return showMessage(message, result.error.message, true);
+    showMessage(message, editingId ? "Cadastro atualizado com sucesso!" : "Vídeo cadastrado com sucesso!");
+    resetForm();
+    await loadVideos();
+  });
+
+  async function deleteVideo(id) {
+    if (!confirm("Tem certeza de que deseja excluir este cadastro?")) return;
+    const {error} = await supabaseClient.from("videos_youtube").delete().eq("id", id);
+    if (error) showMessage(message, error.message, true);
+    else { showMessage(message, "Cadastro excluído."); await loadVideos(); }
+  }
+
+  document.getElementById("searchInput").addEventListener("input", renderVideos);
+  document.getElementById("channelFilter").addEventListener("input", renderVideos);
+  document.getElementById("clearFiltersBtn").addEventListener("click", () => {
+    document.getElementById("searchInput").value = "";
+    document.getElementById("channelFilter").value = "";
+    renderVideos();
+  });
+
+  initialize();
+</script>
+</body>
+</html>
