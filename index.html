@@ -61,14 +61,14 @@
   <section id="authArea" class="auth">
     <div class="card">
       <h1>Controle de Vídeos</h1>
-      <p style="margin-bottom:22px">Entre para cadastrar e organizar seus vídeos do YouTube.</p>
+      <p style="margin-bottom:22px">Entre para consultar os vídeos do YouTube.</p>
       <div class="field">
         <label for="email">E-mail</label>
         <input id="email" type="email" autocomplete="email" placeholder="seuemail@exemplo.com">
       </div>
       <div class="field">
         <label for="password">Senha</label>
-        <input id="password" type="password" autocomplete="current-password" placeholder="Mínimo de 6 caracteres">
+        <input id="password" type="password" name="login-password" autocomplete="off" placeholder="Mínimo de 6 caracteres">
       </div>
       <div class="actions">
         <button id="loginBtn">Entrar</button>
@@ -95,7 +95,7 @@
       </div>
     </header>
 
-    <section class="card">
+    <section id="adminPanel" class="card hidden">
       <h2 id="formTitle">Cadastrar vídeo</h2>
       <form id="videoForm">
         <div class="field">
@@ -112,7 +112,7 @@
         </div>
         <div class="grid">
           <div class="field">
-            <label for="recordedAt">Data da gravação *</label>
+            <label for="recordedAt">Data da gravação</label>
             <input id="recordedAt" type="date">
           </div>
           <div class="field">
@@ -130,6 +130,7 @@
 
     <section class="card">
       <h2>Vídeos cadastrados</h2>
+      <p id="viewerNote" class="muted-note hidden">Acesso de consulta: você pode pesquisar e abrir os vídeos cadastrados.</p>
       <div class="toolbar">
         <input id="searchInput" type="search" placeholder="Pesquisar por canal ou título...">
         <input id="channelFilter" list="channelOptions" placeholder="Filtrar por canal">
@@ -140,11 +141,11 @@
         <table>
           <thead>
             <tr>
-              <th>Canal</th><th>Título</th><th>Gravação</th><th>Postagem</th><th>Link</th><th>Ações</th>
+              <th>Canal</th><th>Título</th><th>Gravação</th><th>Postagem</th><th>Link</th><th id="actionsHeading">Ações</th>
             </tr>
           </thead>
           <tbody id="videoRows">
-            <tr><td colspan="6">Carregando...</td></tr>
+            <tr><td colspan="5">Carregando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -163,6 +164,8 @@
   const form = document.getElementById("videoForm");
   const rows = document.getElementById("videoRows");
   let supabaseClient;
+  const ADMIN_USER_ID = "087f3619-0aa1-41c0-88b6-fa7da70545df";
+  const isAdmin = () => currentUser?.id === ADMIN_USER_ID;
   let currentUser = null;
   let videos = [];
   let editingId = null;
@@ -180,6 +183,7 @@
   function escapeText(value) { return String(value ?? ""); }
 
   function initialize() {
+    document.getElementById("password").value = "";
     if (SUPABASE_URL.startsWith("COLE_AQUI") || SUPABASE_ANON_KEY.startsWith("COLE_AQUI")) {
       showMessage(authMessage, "Configure a URL e a chave do Supabase no início do código antes de usar.", true);
       document.getElementById("loginBtn").disabled = true;
@@ -200,17 +204,30 @@
   }
 
   function renderAuth() {
+    if (!currentUser) document.getElementById("password").value = "";
     authArea.classList.toggle("hidden", !!currentUser);
     appArea.classList.toggle("hidden", !currentUser);
     document.getElementById("userEmail").textContent = currentUser?.email ?? "";
+    document.getElementById("adminPanel").classList.toggle("hidden", !isAdmin());
+    document.getElementById("viewerNote").classList.toggle("hidden", isAdmin());
+    document.getElementById("actionsHeading").classList.toggle("hidden", !isAdmin());
   }
 
   document.getElementById("loginBtn").addEventListener("click", async () => {
     clearMessage(authMessage);
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
     const {error} = await supabaseClient.auth.signInWithPassword({email, password});
-    if (error) showMessage(authMessage, error.message, true);
+    if (error) {
+      // Por segurança, não revela se o e-mail existe e limpa os dois campos.
+      emailInput.value = "";
+      passwordInput.value = "";
+      showMessage(authMessage, "Usuário ou senha incorretos. Confira os dados e tente novamente.", true);
+      emailInput.focus();
+    }
   });
 
   document.getElementById("signupBtn").addEventListener("click", async () => {
@@ -229,11 +246,11 @@
   });
 
   async function loadVideos() {
-    rows.innerHTML = '<tr><td colspan="6">Carregando...</td></tr>';
+    rows.innerHTML = `<tr><td colspan="${isAdmin() ? 6 : 5}">Carregando...</td></tr>`;
     const {data, error} = await supabaseClient.from("videos_youtube")
       .select("*").order("recorded_at", {ascending:false}).order("created_at", {ascending:false});
     if (error) {
-      rows.innerHTML = '<tr><td colspan="6">Não foi possível carregar os dados.</td></tr>';
+      rows.innerHTML = `<tr><td colspan="${isAdmin() ? 6 : 5}">Não foi possível carregar os dados.</td></tr>`;
       showMessage(message, error.message, true);
       return;
     }
@@ -261,7 +278,7 @@
     rows.replaceChildren();
     if (!filtered.length) {
       const tr = document.createElement("tr"), td = document.createElement("td");
-      td.colSpan = 6; td.textContent = "Nenhum vídeo encontrado."; tr.appendChild(td); rows.appendChild(tr);
+      td.colSpan = isAdmin() ? 6 : 5; td.textContent = "Nenhum vídeo encontrado."; tr.appendChild(td); rows.appendChild(tr);
       return;
     }
     filtered.forEach(v => {
@@ -272,6 +289,7 @@
       const linkTd = document.createElement("td");
       const link = document.createElement("a"); link.href = v.video_url; link.target = "_blank"; link.rel = "noopener noreferrer";
       link.textContent = "Abrir vídeo"; linkTd.appendChild(link); tr.appendChild(linkTd);
+      if (isAdmin()) {
       const actionsTd = document.createElement("td");
       const actions = document.createElement("div"); actions.className = "small-actions";
       const edit = document.createElement("button"); edit.type = "button"; edit.className = "secondary"; edit.textContent = "Editar";
@@ -279,16 +297,18 @@
       const del = document.createElement("button"); del.type = "button"; del.className = "danger"; del.textContent = "Excluir";
       del.addEventListener("click", () => deleteVideo(v.id));
       actions.append(edit, del); actionsTd.appendChild(actions); tr.appendChild(actionsTd);
+      }
       rows.appendChild(tr);
     });
   }
 
   function startEdit(v) {
+    if (!isAdmin()) return;
     editingId = v.id;
     document.getElementById("channel").value = v.channel_name;
     document.getElementById("title").value = v.title;
     document.getElementById("videoUrl").value = v.video_url;
-    document.getElementById("recordedAt").value = v.recorded_at;
+    document.getElementById("recordedAt").value = v.recorded_at || "";
     document.getElementById("postedAt").value = v.posted_at || "";
     document.getElementById("formTitle").textContent = "Editar vídeo";
     document.getElementById("saveBtn").textContent = "Atualizar vídeo";
@@ -307,6 +327,7 @@
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault(); clearMessage(message);
+    if (!isAdmin()) return showMessage(message, "Somente o administrador pode salvar vídeos.", true);
     const url = document.getElementById("videoUrl").value.trim();
     let parsed;
     try { parsed = new URL(url); } catch { return showMessage(message, "Informe um link válido.", true); }
@@ -333,6 +354,7 @@
   });
 
   async function deleteVideo(id) {
+    if (!isAdmin()) return;
     if (!confirm("Tem certeza de que deseja excluir este cadastro?")) return;
     const {error} = await supabaseClient.from("videos_youtube").delete().eq("id", id);
     if (error) showMessage(message, error.message, true);
