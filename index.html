@@ -47,6 +47,12 @@
     .auth .card { padding:28px; }
     .muted-note { font-size:12px; margin-top:12px; }
     .top-actions { display:flex; gap:8px; align-items:center; }
+    .link-lookup { margin: -2px 0 16px; padding:14px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; }
+    .lookup-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .lookup-actions input { flex:1; min-width:220px; }
+    #linkLookupResult { margin-top:10px; font-size:13px; line-height:1.5; }
+    .lookup-found { color:#166534; }
+    .lookup-not-found { color:#475569; }
     @media(max-width:650px) {
       .wrap { margin:20px auto; }
       header { align-items:flex-start; flex-direction:column; }
@@ -109,6 +115,14 @@
         <div class="field">
           <label for="videoUrl">Link HTTP/HTTPS do vídeo *</label>
           <input id="videoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=...">
+        </div>
+        <div class="link-lookup">
+          <label for="linkLookupInput">Pesquisa de Link de Vídeo</label>
+          <div class="lookup-actions">
+            <input id="linkLookupInput" type="url" placeholder="Cole aqui o link para verificar se já está cadastrado">
+            <button id="linkLookupBtn" class="secondary" type="button">Pesquisar link</button>
+          </div>
+          <div id="linkLookupResult" role="status" aria-live="polite"></div>
         </div>
         <div class="grid">
           <div class="field">
@@ -181,6 +195,73 @@
     return `${d}/${m}/${y}`;
   }
   function escapeText(value) { return String(value ?? ""); }
+
+  // Gera a mesma chave usada pela proteção criada no Supabase.
+  function videoDedupKey(value) {
+    const raw = String(value ?? "").trim();
+    try {
+      const parsed = new URL(raw);
+      const host = parsed.hostname.toLowerCase();
+      let videoId = "";
+      if (host === "youtu.be" || host.endsWith(".youtu.be")) {
+        videoId = parsed.pathname.split("/").filter(Boolean)[0] || "";
+      } else if (host === "youtube.com" || host.endsWith(".youtube.com")) {
+        videoId = parsed.searchParams.get("v") || "";
+        if (!videoId) {
+          const parts = parsed.pathname.split("/").filter(Boolean);
+          if (["embed", "shorts", "live"].includes((parts[0] || "").toLowerCase())) videoId = parts[1] || "";
+        }
+      }
+      if (/^[A-Za-z0-9_-]{11}$/.test(videoId)) return "youtube:" + videoId;
+    } catch (_) {}
+    return "url:" + raw.toLowerCase();
+  }
+
+  function showLinkLookupResult(video) {
+    const result = document.getElementById("linkLookupResult");
+    result.replaceChildren();
+    if (!video) {
+      result.className = "lookup-not-found";
+      result.textContent = "Este vídeo ainda não está cadastrado.";
+      return;
+    }
+    result.className = "lookup-found";
+    const lines = [
+      "Este vídeo já está cadastrado.",
+      "Canal: " + (video.channel_name || "—"),
+      "Título: " + (video.title || "—"),
+      "Data da postagem: " + dateBR(video.posted_at)
+    ];
+    result.textContent = lines.join("\n");
+    result.style.whiteSpace = "pre-line";
+  }
+
+  function searchVideoLink(value) {
+    const result = document.getElementById("linkLookupResult");
+    const raw = String(value ?? "").trim();
+    result.textContent = "";
+    result.className = "";
+    if (!raw) {
+      result.className = "err";
+      result.textContent = "Cole um link para realizar a pesquisa.";
+      return null;
+    }
+    let parsed;
+    try { parsed = new URL(raw); } catch (_) {
+      result.className = "err";
+      result.textContent = "Informe um link válido começando com http:// ou https://.";
+      return null;
+    }
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      result.className = "err";
+      result.textContent = "O link precisa começar com http:// ou https://.";
+      return null;
+    }
+    const key = videoDedupKey(raw);
+    const found = videos.find(v => videoDedupKey(v.video_url) === key) || null;
+    showLinkLookupResult(found);
+    return found;
+  }
 
   function initialize() {
     document.getElementById("password").value = "";
@@ -322,8 +403,26 @@
     document.getElementById("formTitle").textContent = "Cadastrar vídeo";
     document.getElementById("saveBtn").textContent = "Salvar vídeo";
     document.getElementById("cancelEditBtn").classList.add("hidden");
+    document.getElementById("linkLookupResult").textContent = "";
+    document.getElementById("linkLookupResult").className = "";
+    document.getElementById("linkLookupInput").value = "";
   }
   document.getElementById("cancelEditBtn").addEventListener("click", resetForm);
+
+  document.getElementById("linkLookupBtn").addEventListener("click", () => {
+    searchVideoLink(document.getElementById("linkLookupInput").value);
+  });
+  document.getElementById("linkLookupInput").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      searchVideoLink(event.currentTarget.value);
+    }
+  });
+  document.getElementById("linkLookupInput").addEventListener("input", () => {
+    const result = document.getElementById("linkLookupResult");
+    result.textContent = "";
+    result.className = "";
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault(); clearMessage(message);
@@ -332,6 +431,11 @@
     let parsed;
     try { parsed = new URL(url); } catch { return showMessage(message, "Informe um link válido.", true); }
     if (!["http:", "https:"].includes(parsed.protocol)) return showMessage(message, "O link precisa começar com http:// ou https://.", true);
+    const duplicate = videos.find(v => v.id !== editingId && videoDedupKey(v.video_url) === videoDedupKey(url));
+    if (duplicate) {
+      showMessage(message, `Este vídeo já está cadastrado: "${duplicate.title}" — canal: ${duplicate.channel_name}.`, true);
+      return;
+    }
     const payload = {
       channel_name: document.getElementById("channel").value.trim(),
       title: document.getElementById("title").value.trim(),
@@ -347,7 +451,12 @@
       result = await supabaseClient.from("videos_youtube").insert({...payload, user_id:currentUser.id}).select();
     }
     document.getElementById("saveBtn").disabled = false;
-    if (result.error) return showMessage(message, result.error.message, true);
+    if (result.error) {
+      if (result.error.code === "23505" || /videos_youtube_video_dedup_key_uidx|duplicate key/i.test(result.error.message || "")) {
+        return showMessage(message, "Este link já está cadastrado. Faça a pesquisa em Pesquisa de Link de Vídeo para consultar os dados existentes.", true);
+      }
+      return showMessage(message, result.error.message, true);
+    }
     showMessage(message, editingId ? "Cadastro atualizado com sucesso!" : "Vídeo cadastrado com sucesso!");
     resetForm();
     await loadVideos();
