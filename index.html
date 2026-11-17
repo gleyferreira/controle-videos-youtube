@@ -47,12 +47,19 @@
     .auth .card { padding:28px; }
     .muted-note { font-size:12px; margin-top:12px; }
     .top-actions { display:flex; gap:8px; align-items:center; }
-    .link-lookup { margin: -2px 0 16px; padding:14px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; }
+    .main-nav { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 18px; }
+    .main-nav button.active { background:#1d4ed8; color:#fff; }
+    .channel-description { display:block; color:var(--muted); font-size:11px; margin-top:4px; }
+    .channel-list { display:grid; gap:10px; }
+    .channel-item { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px; border:1px solid var(--line); border-radius:9px; }
+    .channel-item p { font-size:12px; margin-top:4px; }
+    .link-lookup { margin:0; padding:14px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; }
     .lookup-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .lookup-actions input { flex:1; min-width:220px; }
     #linkLookupResult { margin-top:10px; font-size:13px; line-height:1.5; }
     .lookup-found { color:#166534; }
     .lookup-not-found { color:#475569; }
+    #linkLookupResult { margin-top:12px; white-space:pre-line; }
     @media(max-width:650px) {
       .wrap { margin:20px auto; }
       header { align-items:flex-start; flex-direction:column; }
@@ -101,68 +108,108 @@
       </div>
     </header>
 
-    <section id="adminPanel" class="card hidden">
-      <h2 id="formTitle">Cadastrar vídeo</h2>
-      <form id="videoForm">
-        <div class="field">
-          <label for="channel">Nome do canal no YouTube *</label>
-          <input id="channel" maxlength="120" required placeholder="Ex.: CurtaIpatinga">
-        </div>
-        <div class="field">
-          <label for="title">Título do vídeo *</label>
-          <input id="title" maxlength="250" required placeholder="Digite o título publicado ou planejado">
-        </div>
-        <div class="field">
-          <label for="videoUrl">Link HTTP/HTTPS do vídeo *</label>
-          <input id="videoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=...">
-        </div>
-        <div class="link-lookup">
-          <label for="linkLookupInput">Pesquisa de Link de Vídeo</label>
-          <div class="lookup-actions">
-            <input id="linkLookupInput" type="url" placeholder="Cole aqui o link para verificar se já está cadastrado">
-            <button id="linkLookupBtn" class="secondary" type="button">Pesquisar link</button>
-          </div>
-          <div id="linkLookupResult" role="status" aria-live="polite"></div>
-        </div>
-        <div class="grid">
+    <nav class="main-nav" aria-label="Navegação principal">
+      <button type="button" class="secondary active" data-view="videosView">Vídeos</button>
+      <button type="button" class="secondary" data-view="channelsView" id="channelsNavBtn">Gerenciar Canais</button>
+      <button type="button" class="secondary" data-view="linkView">Pesquisa de Link de Vídeo</button>
+    </nav>
+
+    <section id="videosView" class="app-view">
+      <section id="adminPanel" class="card hidden">
+        <h2 id="formTitle">Cadastrar vídeo</h2>
+        <form id="videoForm">
           <div class="field">
-            <label for="recordedAt">Data da gravação</label>
-            <input id="recordedAt" type="date">
+            <label for="channel">Nome do canal no YouTube *</label>
+            <select id="channel" required>
+              <option value="">Selecione um canal</option>
+            </select>
           </div>
           <div class="field">
-            <label for="postedAt">Data da postagem</label>
-            <input id="postedAt" type="date">
+            <label for="title">Título do vídeo *</label>
+            <input id="title" maxlength="250" required placeholder="Digite o título publicado ou planejado">
           </div>
+          <div class="field">
+            <label for="videoUrl">Link HTTP/HTTPS do vídeo *</label>
+            <input id="videoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=...">
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label for="recordedAt">Data da gravação</label>
+              <input id="recordedAt" type="date">
+            </div>
+            <div class="field">
+              <label for="postedAt">Data da postagem *</label>
+              <input id="postedAt" type="date" required>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="saveBtn" type="submit">Salvar vídeo</button>
+            <button id="cancelEditBtn" class="secondary hidden" type="button">Cancelar edição</button>
+          </div>
+        </form>
+        <div id="message" role="status"></div>
+      </section>
+
+      <section class="card">
+        <h2>Vídeos cadastrados</h2>
+        <p id="viewerNote" class="muted-note hidden">Acesso de consulta: você pode pesquisar e abrir os vídeos cadastrados.</p>
+        <div class="toolbar">
+          <input id="searchInput" type="search" placeholder="Pesquisar por canal ou título...">
+          <input id="channelFilter" list="channelOptions" placeholder="Filtrar por canal">
+          <datalist id="channelOptions"></datalist>
+          <button id="clearFiltersBtn" class="secondary" type="button">Limpar filtros</button>
         </div>
-        <div class="actions">
-          <button id="saveBtn" type="submit">Salvar vídeo</button>
-          <button id="cancelEditBtn" class="secondary hidden" type="button">Cancelar edição</button>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Canal / Descrição</th><th>Título</th><th>Gravação</th><th>Postagem</th><th>Link</th><th id="actionsHeading">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="videoRows">
+              <tr><td colspan="5">Carregando...</td></tr>
+            </tbody>
+          </table>
         </div>
-      </form>
-      <div id="message" role="status"></div>
+      </section>
     </section>
 
-    <section class="card">
-      <h2>Vídeos cadastrados</h2>
-      <p id="viewerNote" class="muted-note hidden">Acesso de consulta: você pode pesquisar e abrir os vídeos cadastrados.</p>
-      <div class="toolbar">
-        <input id="searchInput" type="search" placeholder="Pesquisar por canal ou título...">
-        <input id="channelFilter" list="channelOptions" placeholder="Filtrar por canal">
-        <datalist id="channelOptions"></datalist>
-        <button id="clearFiltersBtn" class="secondary" type="button">Limpar filtros</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Canal</th><th>Título</th><th>Gravação</th><th>Postagem</th><th>Link</th><th id="actionsHeading">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="videoRows">
-            <tr><td colspan="5">Carregando...</td></tr>
-          </tbody>
-        </table>
-      </div>
+    <section id="channelsView" class="app-view hidden">
+      <section class="card">
+        <h2 id="channelFormTitle">Cadastrar canal</h2>
+        <form id="channelForm">
+          <div class="field">
+            <label for="channelName">Nome do canal *</label>
+            <input id="channelName" maxlength="120" required placeholder="Ex.: Gospel em Cena">
+          </div>
+          <div class="field">
+            <label for="channelDescription">Descrição / finalidade do canal *</label>
+            <input id="channelDescription" maxlength="300" required placeholder="Ex.: Vídeos evangélicos">
+          </div>
+          <div class="actions">
+            <button id="saveChannelBtn" type="submit">Salvar canal</button>
+            <button id="cancelChannelEditBtn" class="secondary hidden" type="button">Cancelar edição</button>
+          </div>
+          <div id="channelMessage" role="status"></div>
+        </form>
+      </section>
+      <section class="card">
+        <h2>Canais cadastrados</h2>
+        <div id="channelListMessage" role="status" aria-live="polite"></div>
+        <div id="channelList" class="channel-list">Carregando canais...</div>
+      </section>
+    </section>
+
+    <section id="linkView" class="app-view hidden">
+      <section class="card">
+        <h2>Pesquisa de Link de Vídeo</h2>
+        <p class="muted-note" style="margin-bottom:14px">Cole o endereço do YouTube para verificar se o vídeo já está cadastrado.</p>
+        <div class="lookup-actions">
+          <input id="linkLookupInput" type="url" placeholder="Cole aqui o link do vídeo">
+          <button id="linkLookupBtn" class="secondary" type="button">Pesquisar link</button>
+        </div>
+        <div id="linkLookupResult" role="status" aria-live="polite"></div>
+      </section>
     </section>
   </main>
 
@@ -182,7 +229,9 @@
   const isAdmin = () => currentUser?.id === ADMIN_USER_ID;
   let currentUser = null;
   let videos = [];
+  let channels = [];
   let editingId = null;
+  let editingChannelName = null;
 
   function showMessage(element, text, isError=false) {
     element.textContent = text;
@@ -194,6 +243,17 @@
     const [y,m,d] = value.split("-");
     return `${d}/${m}/${y}`;
   }
+  function localDateISO() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  // A data de postagem não pode ser posterior à data atual.
+  const postedAtInput = document.getElementById("postedAt");
+  postedAtInput.max = localDateISO();
   function escapeText(value) { return String(value ?? ""); }
 
   // Gera a mesma chave usada pela proteção criada no Supabase.
@@ -275,12 +335,12 @@
     supabaseClient.auth.onAuthStateChange((_event, session) => {
       currentUser = session?.user ?? null;
       renderAuth();
-      if (currentUser) loadVideos();
+      if (currentUser) { loadVideos(); loadChannels(); }
     });
     supabaseClient.auth.getSession().then(({data}) => {
       currentUser = data.session?.user ?? null;
       renderAuth();
-      if (currentUser) loadVideos();
+      if (currentUser) { loadVideos(); loadChannels(); }
     });
   }
 
@@ -292,6 +352,9 @@
     document.getElementById("adminPanel").classList.toggle("hidden", !isAdmin());
     document.getElementById("viewerNote").classList.toggle("hidden", isAdmin());
     document.getElementById("actionsHeading").classList.toggle("hidden", !isAdmin());
+    if (!isAdmin() && document.getElementById("channelsView").classList.contains("hidden") === false) {
+      showView("videosView");
+    }
   }
 
   document.getElementById("loginBtn").addEventListener("click", async () => {
@@ -326,6 +389,163 @@
     await supabaseClient.auth.signOut();
   });
 
+  function showView(viewId) {
+    if (viewId === "channelsView" && !isAdmin()) viewId = "videosView";
+    document.querySelectorAll(".app-view").forEach(view => view.classList.toggle("hidden", view.id !== viewId));
+    document.querySelectorAll(".main-nav button").forEach(button => button.classList.toggle("active", button.dataset.view === viewId));
+  }
+
+  document.querySelectorAll(".main-nav button").forEach(button => {
+    button.addEventListener("click", () => showView(button.dataset.view));
+  });
+
+  async function loadChannels() {
+    const { data, error } = await supabaseClient
+      .from("canais_youtube").select("name, description").order("name");
+    if (error) {
+      showMessage(message, "Não foi possível carregar os canais: " + error.message, true);
+      return;
+    }
+    channels = data ?? [];
+    renderChannelOptions();
+    renderChannelList();
+    renderVideos();
+  }
+
+  function renderChannelOptions() {
+    const select = document.getElementById("channel");
+    const current = select.value;
+    select.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Selecione um canal";
+    select.appendChild(placeholder);
+    channels.forEach(channel => {
+      const option = document.createElement("option");
+      option.value = channel.name;
+      option.textContent = channel.name;
+      select.appendChild(option);
+    });
+    if (channels.some(channel => channel.name === current)) select.value = current;
+
+    const datalist = document.getElementById("channelOptions");
+    datalist.replaceChildren();
+    channels.forEach(channel => {
+      const option = document.createElement("option");
+      option.value = channel.name;
+      datalist.appendChild(option);
+    });
+  }
+
+  function renderChannelList() {
+    const list = document.getElementById("channelList");
+    list.replaceChildren();
+    if (!channels.length) {
+      list.textContent = "Nenhum canal cadastrado.";
+      return;
+    }
+    channels.forEach(channel => {
+      const item = document.createElement("div");
+      item.className = "channel-item";
+      const info = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = channel.name;
+      const description = document.createElement("p");
+      description.textContent = channel.description;
+      info.append(name, description);
+      item.appendChild(info);
+      if (isAdmin()) {
+        const actions = document.createElement("div");
+        actions.className = "small-actions";
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "secondary";
+        edit.textContent = "Editar";
+        edit.addEventListener("click", () => startChannelEdit(channel));
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "danger";
+        del.textContent = "Excluir";
+        del.addEventListener("click", () => deleteChannel(channel.name));
+        actions.append(edit, del);
+        item.appendChild(actions);
+      }
+      list.appendChild(item);
+    });
+  }
+
+  function startChannelEdit(channel) {
+    if (!isAdmin()) return;
+    editingChannelName = channel.name;
+    document.getElementById("channelName").value = channel.name;
+    document.getElementById("channelDescription").value = channel.description;
+    document.getElementById("channelFormTitle").textContent = "Editar canal";
+    document.getElementById("saveChannelBtn").textContent = "Atualizar canal";
+    document.getElementById("cancelChannelEditBtn").classList.remove("hidden");
+    clearMessage(document.getElementById("channelMessage"));
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  function resetChannelForm() {
+    document.getElementById("channelForm").reset();
+    editingChannelName = null;
+    document.getElementById("channelFormTitle").textContent = "Cadastrar canal";
+    document.getElementById("saveChannelBtn").textContent = "Salvar canal";
+    document.getElementById("cancelChannelEditBtn").classList.add("hidden");
+  }
+
+  document.getElementById("cancelChannelEditBtn").addEventListener("click", resetChannelForm);
+
+  document.getElementById("channelForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const channelMessage = document.getElementById("channelMessage");
+    clearMessage(channelMessage);
+    if (!isAdmin()) return showMessage(channelMessage, "Somente o administrador pode gerenciar canais.", true);
+
+    const name = document.getElementById("channelName").value.trim();
+    const description = document.getElementById("channelDescription").value.trim();
+    if (!name || !description) return showMessage(channelMessage, "Preencha o nome e a descrição do canal.", true);
+
+    document.getElementById("saveChannelBtn").disabled = true;
+    let result;
+    if (editingChannelName) {
+      result = await supabaseClient.from("canais_youtube")
+        .update({name, description}).eq("name", editingChannelName);
+    } else {
+      result = await supabaseClient.from("canais_youtube").insert({name, description});
+    }
+    document.getElementById("saveChannelBtn").disabled = false;
+    if (result.error) {
+      const msg = result.error.code === "23505"
+        ? "Já existe um canal com esse nome."
+        : result.error.message;
+      return showMessage(channelMessage, msg, true);
+    }
+    showMessage(channelMessage, editingChannelName ? "Canal atualizado." : "Canal cadastrado.");
+    resetChannelForm();
+    await loadChannels();
+    await loadVideos();
+  });
+
+  async function deleteChannel(name) {
+    if (!isAdmin()) return;
+    const linked = videos.some(video => video.channel_name === name);
+    if (linked) {
+      return showMessage(document.getElementById("channelListMessage"),
+        `O canal "${name}" possui vídeos associados e não pode ser excluído.`, true);
+    }
+    if (!confirm(`Deseja excluir o canal "${name}"?`)) return;
+    const {error} = await supabaseClient.from("canais_youtube").delete().eq("name", name);
+    const listMessage = document.getElementById("channelListMessage");
+    if (error) {
+      showMessage(listMessage, error.message, true);
+    } else {
+      showMessage(listMessage, `Canal "${name}" excluído com sucesso.`);
+      await loadChannels();
+      window.setTimeout(() => clearMessage(listMessage), 5000);
+    }
+  }
+
   async function loadVideos() {
     rows.innerHTML = `<tr><td colspan="${isAdmin() ? 6 : 5}">Carregando...</td></tr>`;
     const {data, error} = await supabaseClient.from("videos_youtube")
@@ -347,15 +567,8 @@
       (!channel || v.channel_name.toLowerCase().includes(channel))
     );
     document.getElementById("totalVideos").textContent = videos.length;
-    document.getElementById("totalChannels").textContent = new Set(videos.map(v => v.channel_name.toLowerCase())).size;
-    const channels = [...new Set(videos.map(v => v.channel_name))].sort((a,b) => a.localeCompare(b, "pt-BR"));
-    const datalist = document.getElementById("channelOptions");
-    datalist.replaceChildren();
-    channels.forEach(name => {
-      const option = document.createElement("option");
-      option.value = name;
-      datalist.appendChild(option);
-    });
+    document.getElementById("totalChannels").textContent =
+      channels.length || new Set(videos.map(v => v.channel_name.toLowerCase())).size;
     rows.replaceChildren();
     if (!filtered.length) {
       const tr = document.createElement("tr"), td = document.createElement("td");
@@ -364,7 +577,19 @@
     }
     filtered.forEach(v => {
       const tr = document.createElement("tr");
-      [v.channel_name, v.title, dateBR(v.recorded_at), dateBR(v.posted_at)].forEach(value => {
+      const channelTd = document.createElement("td");
+      const channelName = document.createElement("strong");
+      channelName.textContent = v.channel_name || "—";
+      channelTd.appendChild(channelName);
+      const channelInfo = channels.find(channel => channel.name === v.channel_name);
+      if (channelInfo?.description) {
+        const description = document.createElement("span");
+        description.className = "channel-description";
+        description.textContent = channelInfo.description;
+        channelTd.appendChild(description);
+      }
+      tr.appendChild(channelTd);
+      [v.title, dateBR(v.recorded_at), dateBR(v.posted_at)].forEach(value => {
         const td = document.createElement("td"); td.textContent = escapeText(value || "—"); tr.appendChild(td);
       });
       const linkTd = document.createElement("td");
@@ -387,6 +612,10 @@
     if (!isAdmin()) return;
     editingId = v.id;
     document.getElementById("channel").value = v.channel_name;
+    if (!channels.some(channel => channel.name === v.channel_name)) {
+      showMessage(message, "O canal deste vídeo não está na lista de canais. Cadastre-o antes de editar.", true);
+      return;
+    }
     document.getElementById("title").value = v.title;
     document.getElementById("videoUrl").value = v.video_url;
     document.getElementById("recordedAt").value = v.recorded_at || "";
@@ -441,8 +670,18 @@
       title: document.getElementById("title").value.trim(),
       video_url: url,
       recorded_at: document.getElementById("recordedAt").value || null,
-      posted_at: document.getElementById("postedAt").value || null
+      posted_at: document.getElementById("postedAt").value
     };
+    if (!payload.posted_at) {
+      showMessage(message, "Informe a data da postagem. Este campo é obrigatório.", true);
+      document.getElementById("postedAt").focus();
+      return;
+    }
+    if (payload.posted_at > localDateISO()) {
+      showMessage(message, "A data da postagem não pode ser futura. Informe hoje ou uma data anterior.", true);
+      document.getElementById("postedAt").focus();
+      return;
+    }
     document.getElementById("saveBtn").disabled = true;
     let result;
     if (editingId) {
