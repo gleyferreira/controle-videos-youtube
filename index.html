@@ -41,6 +41,7 @@
     .small-actions { display:flex; gap:6px; }
     .small-actions button { padding:7px 9px; font-size:12px; }
     #message { margin:12px 0; font-size:14px; }
+    #navMessage { margin:8px 0 14px; font-size:14px; }
     .ok { color:#15803d; } .err { color:#b91c1c; }
     .hidden { display:none !important; }
     .auth { max-width:440px; margin:65px auto; }
@@ -50,6 +51,7 @@
     .main-nav { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 18px; }
     .main-nav button.active { background:#1d4ed8; color:#fff; }
     .channel-description { display:block; color:var(--muted); font-size:11px; margin-top:4px; }
+    #channelDescriptionPreview { display:block; color:var(--muted); font-size:12px; margin-top:6px; min-height:18px; }
     .channel-list { display:grid; gap:10px; }
     .channel-item { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px; border:1px solid var(--line); border-radius:9px; }
     .channel-item p { font-size:12px; margin-top:4px; }
@@ -113,6 +115,7 @@
       <button type="button" class="secondary" data-view="channelsView" id="channelsNavBtn">Gerenciar Canais</button>
       <button type="button" class="secondary" data-view="linkView">Pesquisa de Link de Vídeo</button>
     </nav>
+    <div id="navMessage" role="status" aria-live="polite"></div>
 
     <section id="videosView" class="app-view">
       <section id="adminPanel" class="card hidden">
@@ -123,6 +126,7 @@
             <select id="channel" required>
               <option value="">Selecione um canal</option>
             </select>
+            <small id="channelDescriptionPreview" aria-live="polite"></small>
           </div>
           <div class="field">
             <label for="title">Título do vídeo *</label>
@@ -390,7 +394,12 @@
   });
 
   function showView(viewId) {
-    if (viewId === "channelsView" && !isAdmin()) viewId = "videosView";
+    const navMessage = document.getElementById("navMessage");
+    if (viewId === "channelsView" && !isAdmin()) {
+      showMessage(navMessage, "Esta funcionalidade está disponível apenas para o administrador.", true);
+      return;
+    }
+    clearMessage(navMessage);
     document.querySelectorAll(".app-view").forEach(view => view.classList.toggle("hidden", view.id !== viewId));
     document.querySelectorAll(".main-nav button").forEach(button => button.classList.toggle("active", button.dataset.view === viewId));
   }
@@ -412,6 +421,15 @@
     renderVideos();
   }
 
+  function updateChannelDescriptionPreview() {
+    const selectedName = document.getElementById("channel").value;
+    const preview = document.getElementById("channelDescriptionPreview");
+    const selectedChannel = channels.find(channel => channel.name === selectedName);
+    preview.textContent = selectedChannel ? selectedChannel.description : "";
+  }
+
+  document.getElementById("channel").addEventListener("change", updateChannelDescriptionPreview);
+
   function renderChannelOptions() {
     const select = document.getElementById("channel");
     const current = select.value;
@@ -427,6 +445,7 @@
       select.appendChild(option);
     });
     if (channels.some(channel => channel.name === current)) select.value = current;
+    updateChannelDescriptionPreview();
 
     const datalist = document.getElementById("channelOptions");
     datalist.replaceChildren();
@@ -452,7 +471,13 @@
       name.textContent = channel.name;
       const description = document.createElement("p");
       description.textContent = channel.description;
-      info.append(name, description);
+      const videoCount = videos.filter(video =>
+        (video.channel_name || "").trim().toLowerCase() === channel.name.trim().toLowerCase()
+      ).length;
+      const count = document.createElement("p");
+      count.className = "channel-description";
+      count.textContent = `${videoCount} ${videoCount === 1 ? "vídeo cadastrado" : "vídeos cadastrados"}`;
+      info.append(name, description, count);
       item.appendChild(info);
       if (isAdmin()) {
         const actions = document.createElement("div");
@@ -557,6 +582,7 @@
     }
     videos = data ?? [];
     renderVideos();
+    renderChannelList();
   }
 
   function renderVideos() {
@@ -612,6 +638,7 @@
     if (!isAdmin()) return;
     editingId = v.id;
     document.getElementById("channel").value = v.channel_name;
+    updateChannelDescriptionPreview();
     if (!channels.some(channel => channel.name === v.channel_name)) {
       showMessage(message, "O canal deste vídeo não está na lista de canais. Cadastre-o antes de editar.", true);
       return;
@@ -629,6 +656,7 @@
 
   function resetForm() {
     form.reset(); editingId = null;
+    updateChannelDescriptionPreview();
     document.getElementById("formTitle").textContent = "Cadastrar vídeo";
     document.getElementById("saveBtn").textContent = "Salvar vídeo";
     document.getElementById("cancelEditBtn").classList.add("hidden");
